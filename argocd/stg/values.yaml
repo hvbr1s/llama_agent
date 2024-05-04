@@ -1,0 +1,85 @@
+env: stg
+datadog: true
+image:
+  name: "ghcr.io/ledgerhq/knowledge_bot"
+  pullSecret: "github-ledgerhq"
+  tag: "v2.8.2"
+
+hpa:
+  enabled: true
+  maxReplicas: 2
+  minReplicas: 1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+host: "knowlbot.aws.stg.ldg-tech.com"
+# MO-8812:
+# That's required as public integration with Slack services,
+# which are also in the cloud and don't have static IPs.
+whitelistSourceRange: "0.0.0.0/0,::/0"
+whitelistSourceRangeRestricted: "0.0.0.0/0,::/0"
+serverAlias:
+  - knowlbot.staging.aws.ledger.fr
+#serverSnippet:
+#  nginx.ingress.kubernetes.io/server-snippet: |
+#    set $X-Forwarded-For $X-Original-Forwarded-For;
+#    rewrite foo bar permanent;
+port: 80
+livenessProbePath: "/_health"
+readinessProbePath: "/_health"
+
+environment:
+  - name: DD_LOGS_INJECTION
+    value: "true"
+  - name: DD_PROFILING_ENABLED
+    value: "false"
+  - name: DD_JMXFETCH_ENABLED
+    value: "true"
+  - name: DD_RUNTIME_METRICS_ENABLED
+    value: "true"
+  - name: DD_TRACE_AGENT_PORT
+    value: "8126"
+
+resources:
+  requests:
+    memory: "400Mi"
+    cpu: "250m"
+  limits:
+    memory: "2Gi"
+    cpu: "750m"
+
+external-secrets:
+  tf-openai:
+    secretStoreRef: aws-ledgerstg
+    dataFrom:
+    - extract:
+        key: knowledge-bot-stg/tf-openai
+  tf-alchemy:
+    secretStoreRef: aws-ledgerstg
+    dataFrom:
+    - extract:
+        key: knowledge-bot-stg/tf-alchemy
+  tf-pinecone:
+    secretStoreRef: aws-ledgerstg
+    dataFrom:
+    - extract:
+        key: knowledge-bot-stg/tf-pinecone
+  env-file:
+    secretStoreRef: aws-ledgerstg
+    data:
+      - remoteRef:
+          key: knowledge-bot-stg/env-file
+        secretKey: .env
+  github-ledgerhq:
+    secretStoreRef: aws-ledgerstg
+    data:
+      - remoteRef:
+          key: infra/dockerconfigjson-github-com/v01
+        secretKey: .dockerconfigjson
+    template:
+      type: kubernetes.io/dockerconfigjson
